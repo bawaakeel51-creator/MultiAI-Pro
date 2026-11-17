@@ -1,0 +1,36 @@
+import {Miniflare} from 'miniflare';
+import {createHash} from 'node:crypto';
+import assert from 'node:assert/strict';
+import {mkdtempSync,rmSync} from 'node:fs';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
+const persist=mkdtempSync(join(tmpdir(),'multiai-runtime-'));
+const token='a'.repeat(43),origin='https://example.com';
+const options={durableObjectsPersist:persist,modules:true,scriptPath:'worker/index.js',compatibilityDate:'2026-07-30',bindings:{AI_ENABLED:'false',ALLOWED_ORIGINS:origin,AUTH_TOKEN_HASHES:JSON.stringify({[createHash('sha256').update(token).digest('hex')]:'owner'})},durableObjects:{QUOTAS:{className:'QuotaGate',useSQLite:true}},outboundService:()=>{throw Error('Outbound network forbidden in QA');}};
+let mf;
+try {
+ mf=new Miniflare(options);
+ const req=(authorization='Bearer '+token,body=JSON.stringify({messages:[{role:'user',content:'Hello'}]}))=>mf.dispatchFetch('http://localhost/api/chat',{method:'POST',headers:{Origin:origin,Authorization:authorization,'Content-Type':'application/json'},body});
+ assert.equal((await req()).status,503);
+ assert.equal((await req('Bearer bad')).status,401);
+ assert.equal((await req('Bearer '+token,'{')).status,400);
+ const namespace=await mf.getDurableObjectNamespace('QUOTAS');
+ const gate=namespace.get(namespace.idFromName('global-v1'));
+ const reserve=()=>gate.fetch('https://quota/reserve',{method:'POST',body:JSON.stringify({user:'owner'})});
+ const results=await Promise.all(Array.from({length:20},reserve));
+ assert.equal(results.filter(r=>r.status===200).length,3);
+ assert.equal((await reserve()).status,429);
+ await mf.dispose();
+ mf=new Miniflare(options);
+ const restored=await mf.getDurableObjectNamespace('QUOTAS');
+ const restarted=restored.get(restored.idFromName('global-v1'));
+ const afterRestart=await restarted.fetch('https://quota/reserve',{method:'POST',body:JSON.stringify({user:'owner'})});
+ if(afterRestart.status===200) assert.equal((await afterRestart.json()).remaining,16);
+ else assert.equal(afterRestart.status,429);
+ const used=afterRestart.status===200?4:3;
+ const globalResults=[];
+ for(let i=0;i<40;i++) for(let j=0;j<3;j++) globalResults.push(await restarted.fetch('https://quota/reserve',{method:'POST',body:JSON.stringify({user:'test_'+i})}));
+ assert.equal(globalResults.filter(r=>r.status===200).length,100-used);
+ assert.equal(globalResults.at(-1).status,429);
+ console.log('PASS local workerd: AI OFF, auth, validation, SQLite DO concurrency, quota, global cap and persisted restart');
+} finally {await mf?.dispose();rmSync(persist,{recursive:true,force:true});}

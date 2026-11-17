@@ -1,12 +1,12 @@
 import {Miniflare} from 'miniflare';
 import {createHash} from 'node:crypto';
 import assert from 'node:assert/strict';
-import {mkdtempSync,rmSync} from 'node:fs';
+import {mkdtempSync,rmSync,readFileSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 const persist=mkdtempSync(join(tmpdir(),'multiai-runtime-'));
 const token='a'.repeat(43),origin='https://example.com';
-const options={durableObjectsPersist:persist,modules:true,scriptPath:'worker/index.js',compatibilityDate:'2026-07-30',bindings:{AI_ENABLED:'false',ALLOWED_ORIGINS:origin,AUTH_TOKEN_HASHES:JSON.stringify({[createHash('sha256').update(token).digest('hex')]:'owner'})},durableObjects:{QUOTAS:{className:'QuotaGate',useSQLite:true}},outboundService:()=>{throw Error('Outbound network forbidden in QA');}};
+const options={durableObjectsPersist:persist,modules:true,script:"Date.now = () => 1805414400000;\n"+readFileSync(new URL('../worker/index.js',import.meta.url),'utf8'),compatibilityDate:'2026-07-30',bindings:{AI_ENABLED:'false',ALLOWED_ORIGINS:origin,AUTH_TOKEN_HASHES:JSON.stringify({[createHash('sha256').update(token).digest('hex')]:'owner'})},durableObjects:{QUOTAS:{className:'QuotaGate',useSQLite:true}},outboundService:()=>{throw Error('Outbound network forbidden in QA');}};
 let mf;
 try {
  mf=new Miniflare(options);
@@ -25,9 +25,10 @@ try {
  const restored=await mf.getDurableObjectNamespace('QUOTAS');
  const restarted=restored.get(restored.idFromName('global-v1'));
  const afterRestart=await restarted.fetch('https://quota/reserve',{method:'POST',body:JSON.stringify({user:'owner'})});
- if(afterRestart.status===200) assert.equal((await afterRestart.json()).remaining,16);
- else assert.equal(afterRestart.status,429);
- const used=afterRestart.status===200?4:3;
+ // Test-only frozen clock prevents minute/day boundary flakes in CI and makes
+ // restart persistence strict: the exhausted burst must survive disposal.
+ assert.equal(afterRestart.status,429);
+ const used=3;
  const globalResults=[];
  for(let i=0;i<40;i++) for(let j=0;j<3;j++) globalResults.push(await restarted.fetch('https://quota/reserve',{method:'POST',body:JSON.stringify({user:'test_'+i})}));
  assert.equal(globalResults.filter(r=>r.status===200).length,100-used);

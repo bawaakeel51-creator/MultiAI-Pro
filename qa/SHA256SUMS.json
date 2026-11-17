@@ -9,7 +9,7 @@
   "package-lock.json": "42334fdf873e6050bf6b37756ad3e3813c701ee9a1969f3ba0756781680dfdaf",
   "package.json": "e6bd5e03258a26022a87c64e81bf0421d7951e6ad35868e197e414b5af69a576",
   "qa/dependency-audit.json": "2633367e5d7081c6ca6668b0f804aea59eb663f0f86dfd820d6345aed1c7231c",
-  "qa/runtime.mjs": "72ba5991767fc6cb3c80f49dacd43576c47389f073bd123157df295be0cf063e",
+  "qa/runtime.mjs": "72c7da8af9836e7124ce5fb7e5c05be30dbaa3db2b7ffbf64c4ce2db8edd7baa",
   "styles.css": "bca39db842485e7c655fa051187b2ac8360421ee29e643d26ad509ccf1d48eee",
   "test/ui.test.js": "0379a8203a79c87fb95cb37e607aec1afc809466097cea948474f5f7a597b3f0",
   "test/worker.test.js": "20b21a08033b82c4e135e0b6f9aadf6fae88af797feabd4418c788f0643a7787",

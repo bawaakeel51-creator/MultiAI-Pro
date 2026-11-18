@@ -1,0 +1,38 @@
+name: Secure MVP CI
+
+on:
+  push:
+    branches: [feature/secure-gemini-mvp]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: secure-mvp-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      AI_ENABLED: 'false'
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: '22'
+          package-manager-cache: false
+      - name: Verify source checksums
+        run: node qa/verify-checksums.mjs
+      - run: npm ci
+      - run: npm test
+      - run: npm run check
+      - run: npm run test:runtime
+      - run: npm audit
+      - name: Verify checksums after tests
+        run: node qa/verify-checksums.mjs

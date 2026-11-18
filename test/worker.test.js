@@ -1,0 +1,31 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {createWorker,digest,QuotaGate,validMessages} from '../worker/index.js';
+const token='a'.repeat(43), origin='https://example.com';
+const provider=()=>Promise.resolve(Response.json({candidates:[{finishReason:'STOP',content:{parts:[{text:'Hello'}]}}]}));
+async function setup(fetcher=provider){
+ const data=new Map();let queue=Promise.resolve();
+ const storage={get:async k=>structuredClone(data.get(k)),put:async(k,v)=>data.set(k,structuredClone(v)),transaction(fn){const p=queue.then(()=>fn(this));queue=p.catch(()=>{});return p;}};
+ const gate=new QuotaGate({storage});
+ const env={AI_ENABLED:'true',ALLOWED_ORIGINS:origin,GEMINI_MODEL:'gemini-test',GEMINI_API_KEY:'test-placeholder',AUTH_TOKEN_HASHES:JSON.stringify({[await digest(token)]:'owner'}),QUOTAS:{idFromName:n=>n,get:()=>gate}};
+ return {env,worker:createWorker(fetcher),gate};
+}
+function request(body={messages:[{role:'user',content:'Hi'}]},headers={},method='POST',path='/api/chat'){return new Request('https://api.example'+path,{method,headers:{Origin:origin,Authorization:'Bearer '+token,'Content-Type':'application/json',...headers},...(method==='POST'?{body:typeof body==='string'?body:JSON.stringify(body)}:{})});}
+test('authenticated chat maps roles, keeps key in header and bounds output',async()=>{let calls=0;const {worker,env}=await setup(async(url,options)=>{calls++;assert(!url.includes(env.GEMINI_API_KEY));assert.equal(options.headers['x-goog-api-key'],env.GEMINI_API_KEY);assert.equal(JSON.parse(options.body).generationConfig.maxOutputTokens,512);return provider();});const r=await worker.fetch(request(),env);assert.equal(r.status,200);assert.equal((await r.json()).answer,'Hello');assert.equal(calls,1);assert.equal(r.headers.get('Cache-Control'),'no-store');});
+test('AI OFF never invokes provider or quotas',async()=>{const {worker,env}=await setup(()=>assert.fail('network'));env.AI_ENABLED='false';env.QUOTAS=null;assert.equal((await worker.fetch(request(),env)).status,503);});
+test('rejects missing, invalid and revoked authentication',async()=>{const {worker,env}=await setup(()=>assert.fail('network'));for(const value of ['', 'Bearer bad','Bearer '+'b'.repeat(43)])assert.equal((await worker.fetch(request(undefined,{Authorization:value}),env)).status,401);});
+test('exact CORS, preflight, routes and methods',async()=>{const {worker,env}=await setup();assert.equal((await worker.fetch(request(undefined,{Origin:'https://evil.com'}),env)).status,403);assert.equal((await worker.fetch(request(undefined,{Origin:''}),env)).status,403);const r=await worker.fetch(request(undefined,{},'OPTIONS'),env);assert.equal(r.status,204);assert.equal(r.headers.get('Access-Control-Allow-Origin'),origin);assert.equal((await worker.fetch(request(undefined,{},'GET'),env)).status,405);assert.equal((await worker.fetch(request(undefined,{},'POST','/other'),env)).status,404);});
+test('invalid payload, oversized body and content type blocked',async()=>{const {worker,env}=await setup(()=>assert.fail('network'));for(const body of ['{','null',{messages:[]},{messages:[{role:'system',content:'x'}]},{messages:[{role:'user',content:'a'.repeat(2001)}]}])assert.equal((await worker.fetch(request(body),env)).status,400);assert.equal((await worker.fetch(request('x'.repeat(17000)),env)).status,413);assert.equal((await worker.fetch(request(undefined,{'Content-Type':'text/plain'}),env)).status,415);});
+test('quota concurrency reserves only three requests per minute',async()=>{const {gate}=await setup();const results=await Promise.all(Array.from({length:25},()=>gate.fetch(new Request('https://quota',{method:'POST',body:JSON.stringify({user:'owner'})}))));assert.equal(results.filter(r=>r.status===200).length,3);assert(results.filter(r=>r.status===429).every(r=>Number(r.headers.get('Retry-After'))>0));});
+test('daily user and global caps, reset and durable restart',async()=>{const {gate}=await setup();const now=Date.now,day=Math.floor(now()/86400000);try{for(let i=0;i<20;i++){Date.now=()=>day*86400000+i*60000;assert.equal((await gate.fetch(new Request('https://q',{method:'POST',body:JSON.stringify({user:'one'})}))).status,200);}Date.now=()=>day*86400000+21*60000;const restarted=new QuotaGate({storage:gate.storage});assert.equal((await restarted.fetch(new Request('https://q',{method:'POST',body:JSON.stringify({user:'one'})}))).status,429);await gate.storage.put('global',{day,total:100});assert.equal((await gate.fetch(new Request('https://q',{method:'POST',body:JSON.stringify({user:'two'})}))).status,429);Date.now=()=>(day+1)*86400000;assert.equal((await gate.fetch(new Request('https://q',{method:'POST',body:JSON.stringify({user:'one'})}))).status,200);}finally{Date.now=now;}});
+test('provider errors never expose secret or raw response',async()=>{for(const fetcher of [async()=>new Response('SECRET',{status:429}),async()=>{throw Error('SECRET');},async()=>Response.json({candidates:[]}),async()=>new Response('invalid')]){const {worker,env}=await setup(fetcher);const r=await worker.fetch(request(),env);assert(r.status>=400);assert(!(await r.text()).includes('SECRET'));}});
+test('quota and config failures fail closed',async()=>{const {worker,env}=await setup(()=>assert.fail('network'));env.QUOTAS.get=()=>({fetch:async()=>{throw Error('private');}});assert.equal((await worker.fetch(request(),env)).status,503);env.AUTH_TOKEN_HASHES='bad';assert.equal((await worker.fetch(request(),env)).status,503);});
+test('message role and aggregate validation',()=>{assert(!validMessages([{role:'user',content:'x'},{role:'user',content:'y'}]));assert(!validMessages(Array.from({length:9},(_,i)=>({role:i%2?'assistant':'user',content:'x'.repeat(1000)}))));});
+
+test('content type must be JSON media type, not a prefix lookalike',async()=>{
+ const {worker,env}=await setup(()=>assert.fail('provider must not run'));
+ for(const type of ['application/jsonp','application/json-malicious'])
+  assert.equal((await worker.fetch(request(undefined,{'Content-Type':type}),env)).status,415);
+ env.AI_ENABLED='false';
+ assert.equal((await worker.fetch(request(undefined,{'Content-Type':'Application/JSON; charset=utf-8'}),env)).status,503);
+});

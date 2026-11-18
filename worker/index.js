@@ -3,7 +3,7 @@ export async function digest(token) {
   return [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(token)))].map(x=>x.toString(16).padStart(2,'0')).join('');
 }
 async function readBody(request) {
-  if (!request.headers.get('Content-Type')?.startsWith('application/json')) throw 415;
+  if ((request.headers.get('Content-Type')||'').split(';',1)[0].trim().toLowerCase()!=='application/json') throw 415;
   const reader = request.body?.getReader();
   if (!reader) throw 400;
   let size=0, parts=[];

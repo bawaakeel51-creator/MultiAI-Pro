@@ -1,12 +1,18 @@
+import {createRequire} from 'node:module';
 import {Miniflare} from 'miniflare';
 import {createHash} from 'node:crypto';
 import assert from 'node:assert/strict';
 import {mkdtempSync,rmSync,readFileSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
+const compatibilityDate=readFileSync(new URL('../wrangler.toml',import.meta.url),'utf8').match(/^compatibility_date = "(\d{4}-\d{2}-\d{2})"$/m)[1];
+const runtimeVersion=createRequire(import.meta.url)('workerd/package.json').version;
+const runtimeDate=runtimeVersion.split('.')[1];
+assert(runtimeDate>=compatibilityDate.replaceAll('-',''),'Installed workerd must support the configured date; never silently fall back');
+console.log(`Runtime ${runtimeVersion}; compatibility_date ${compatibilityDate}`);
 const persist=mkdtempSync(join(tmpdir(),'multiai-runtime-'));
 const token='a'.repeat(43),origin='https://example.com';
-const options={durableObjectsPersist:persist,modules:true,script:"Date.now = () => 1805414400000;\n"+readFileSync(new URL('../worker/index.js',import.meta.url),'utf8'),compatibilityDate:'2026-07-30',bindings:{AI_ENABLED:'false',ALLOWED_ORIGINS:origin,AUTH_TOKEN_HASHES:JSON.stringify({[createHash('sha256').update(token).digest('hex')]:'owner'})},durableObjects:{QUOTAS:{className:'QuotaGate',useSQLite:true}},outboundService:()=>{throw Error('Outbound network forbidden in QA');}};
+const options={durableObjectsPersist:persist,modules:true,script:"Date.now = () => 1805414400000;\n"+readFileSync(new URL('../worker/index.js',import.meta.url),'utf8'),compatibilityDate,bindings:{AI_ENABLED:'false',ALLOWED_ORIGINS:origin,AUTH_TOKEN_HASHES:JSON.stringify({[createHash('sha256').update(token).digest('hex')]:'owner'})},durableObjects:{QUOTAS:{className:'QuotaGate',useSQLite:true}},outboundService:()=>{throw Error('Outbound network forbidden in QA');}};
 let mf;
 try {
  mf=new Miniflare(options);

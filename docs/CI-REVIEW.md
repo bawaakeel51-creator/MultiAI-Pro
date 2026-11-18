@@ -1,32 +1,38 @@
-# Draft PR #1 CI and security review — 17 November 2026
+# Final pre-release audit — 17 November 2026
 
-Reviewed baseline 2bca65586740c451a38088e1550c644a063c2aeb, including its correct runtime checksum. Existing production Worker, UI, lockfile and Wrangler configuration are preserved. No main update, merge, deployment, billing or live Gemini request.
+Baseline: eff2b89bc06ef6f7b462075681eea146db09283d on Draft PR #1, feature/secure-gemini-mvp. main remains 985586138f236218999c29e85964236695628bec. Earlier work and the checksum fix were preserved; intended changed-file digests are regenerated after validation. Local results below do not imply a remote commit or deployment.
 
-## Changes
-- Node 22 GitHub Actions job runs on feature branch pushes and PRs targeting main, including drafts. Uses immutable action SHAs, contents:read, no persisted credentials, no secrets, no deployment, 10-minute timeout and cancellation of superseded runs. No pull_request_target event.
-- Runs checksum validation, npm ci, npm test, npm run check, npm run test:runtime, npm audit and checksum validation again. npm audit fails on reported vulnerabilities; audit availability is also a CI dependency.
-- Checksum verifier requires exact coverage of every tracked file except the manifest itself. It detects changes and missing/new unlisted files; it is a consistency check, not a signature. Review manifest changes alongside code.
-- Fixed a real runtime-test flake: wall-clock minute/day transitions could change burst/global-cap assertions. A test-only frozen Date.now is prepended to the in-memory Worker source; production code is untouched. Restart now strictly asserts 429 instead of permitting either status. Updated runtime checksum intentionally; baseline checksum fix was verified before changes.
+## Fixed locally
+- A stale request timer closed over the mutable global controller and could abort a new signed-in session. The timer/fetch now use a request-local controller. Mock regression failed before and passes after.
+- Content-Type prefix matching accepted application/jsonp and rejected valid mixed-case JSON. Exact media-type parsing now accepts Application/JSON with parameters and rejects lookalikes before quota/provider access. Regression failed before and passes after.
+- Runtime QA hard-coded July instead of production November. Pin test-only workerd 1.20261117.1, read 2026-11-01 directly from Wrangler config, reject an older runtime before launch, retain the test-only frozen clock and strict restart assertions. No date downgrade or deployment.
 
-## Validation
-Node v22.23.5: npm ci, 16/16 tests and syntax checks PASS. Runtime and audit results are recorded in the PR after final checks. No real provider requests; unit tests inject mocks and the local runtime blocks all outbound calls with AI OFF.
+## Verified local PASS
+- Node 22: 18/18 unit/DOM tests, syntax checks, local workerd SQLite concurrency/global cap/restart tests, npm audit (zero reported vulnerabilities).
+- Firefox rendered the actual local index.html/app.js/styles.css through an intercepted HTTPS QA origin at 320/375/768px. All other requests were blocked or locally mocked. No source injection or live AI. No horizontal overflow; visible keyboard focus/Tab; Enter expands access settings; 44px button targets (rounded subpixel bounds); empty/invalid access/AI-OFF states; mock XSS text rendering; long-response scrolling; signout state clearing; zero page errors.
+- V1 preservation: docs/v1-preview.html byte-for-byte matches index.html at main 9855861 (SHA-256 5ef615d744c82f4a7b4b1f962c2f901eb6b6bf1d6305b66b13cb7060a7037503).
+- Production config retains AI_ENABLED=false, blank model and workers_dev=false. Dummy tokens and mocked providers only.
 
-Authentication: invite-only per-user SHA-256 bearer-token hashes; malformed, absent and revoked tokens rejected. UI retains token in memory, clears it on signout and ignores stale responses. Tokens need owner revocation; automatic expiry and public signup are absent by design. Only use owner-approved Worker endpoints.
+## Security and workflow review
+Invite-only random bearer tokens are hashed server-side and kept in UI memory; owner revocation required, no automatic expiry/public signup. Missing/invalid/revoked authentication is rejected. Stable user IDs must survive rotation. Never use the provider key as an access token or enter tokens into untrusted endpoints.
 
-CORS: exact origin matching, no wildcard or cookies; missing/hostile origins rejected. CORS is not an authentication boundary. The configured GitHub Pages origin is shared by all repositories under that account; use a dedicated trusted frontend origin before broader rollout.
+CORS uses exact origins and no cookies/wildcards; CORS is not authentication. GitHub Pages shares the account origin across repositories. Prefer a dedicated trusted frontend origin before wider rollout. Plain-text DOM rendering prevents model HTML execution. CSP avoids inline script/eval. Request bodies are byte-bounded; input lengths and roles validated; provider output and tokens bounded; redirects rejected; sanitized errors; no prompts/tokens/responses stored. The 2000-character per-message and 8000-total conversation limits also apply to submitted assistant history; large replies can require a fresh conversation.
 
-Quotas: transactional singleton SQLite Durable Object reserves 3/user/minute, 20/user/day, 100/global/day before provider calls, with persistence and concurrency checks. Failed calls consume quota intentionally. Fixed windows permit boundary bursts; rotation must retain stable user IDs. This is not an upstream DDoS shield.
+Singleton SQLite Durable Object reserves quotas transactionally before provider calls: 3/user/fixed minute, 20/user/UTC day, 100/global/UTC day. Failed calls consume quota; fixed windows allow boundary bursts. This is an invite-only application quota, not an upstream DDoS shield. Storage/config failures fail closed.
 
-Mobile/accessibility: labels, live status/log, password field, visible focus, 44px buttons, wrapping and narrow-screen CSS are present; DOM tests cover escaping, duplicate submits and signout. Rendered 320/375/768px, full keyboard and screen-reader QA remain PENDING: local Chromium launch is blocked by socket() Operation not permitted. Do not infer visual PASS from static tests.
+CI remains Node 22, SHA-pinned checkout/setup-node, contents:read, persist-credentials:false, no secrets, no pull_request_target, 10-minute timeout, cancellation of superseded runs. Commands: checksum validation, npm ci, npm test, npm run check, npm run test:runtime, npm audit, checksum validation. npm audit may also fail if registry access is unavailable. Checksums cover every tracked file except the manifest; they are consistency checks, not signatures. Review manifest edits with code.
 
-Runtime: local Miniflare/workerd uses 2026-07-30, while wrangler.toml declares 2026-11-01. SQLite DO behavior passed locally; exact production-date compatibility remains PENDING. Keep this explicit rather than silently lowering the production date or claiming deployment parity. Before release, use a supported current runtime at the declared date and review remote migrations for a v1 tag collision.
+## Pending / blocked
+- Connected browser reports originating browser context unavailable. No Cloudflare connector is available. Remote multiai-pro-api account, bindings, routes, custom domains, preview URLs and migration history were not inspected.
+- Local v1 migration uses new_sqlite_classes=["QuotaGate"] and binding QUOTAS. Local SQLite behavior passed; it does not establish that v1 is unused or compatible with the existing deployed Worker. Check remote migrations before any approved deployment; do not invent or overwrite tags.
+- workers_dev=false disables the production workers.dev endpoint; no repository route/custom domain is declared. A dashboard-managed route may exist. Read-only dashboard review must determine the actual frontend endpoint before changing anything. If none exists, separately approve either workers.dev exposure or a verified owned domain/zone route. Inspect preview exposure independently; prefer explicit preview_urls=false unless intentionally approved. No routing changes made.
+- Physical Android/iOS, screen-reader behavior and full WCAG conformance are unverified; Firefox responsive checks are not device certification.
+- Any new changes need a feature-branch commit and fresh successful GitHub CI before they can be called PR-verified. Do not reuse eff2b89 CI as evidence for a later head.
 
-## Routing recommendation — no config change or deployment
-workers_dev=false disables the production workers.dev URL. The repository declares no route or custom domain. This does not prove the dashboard lacks a separately managed route; remote Cloudflare account/settings have not been accessed.
-
-Before a separately approved deployment, confirm the existing Worker account/name (multiai-pro-api) and dashboard Domains & Routes. Choose either an approved workers.dev endpoint (set workers_dev=true) or keep false and configure a verified custom domain/zone route for /api/chat. Do not invent a domain or zone ID. Review preview URL exposure too; prefer explicit preview_urls=false unless previews are intentionally approved. Retain AI_ENABLED=false and blank model until their separate approvals. A route alone does not enable Gemini.
+Keep PR DRAFT, AI OFF, main unchanged. No live Gemini calls, billing, merge, release, production publishing or deployment.
 
 References:
 - https://developers.cloudflare.com/workers/configuration/routing/workers-dev/
 - https://developers.cloudflare.com/workers/wrangler/configuration/
+- https://developers.cloudflare.com/durable-objects/reference/durable-objects-migrations/
 - https://docs.github.com/en/actions/reference/security/secure-use

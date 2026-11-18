@@ -18,8 +18,8 @@ $('composer').onsubmit=async event=>{
  event.preventDefault();if(busy||!token)return;const text=$('prompt').value.trim();if(!text)return;
  if(history.length>=10){status('Conversation limit reached. Sign out and reconnect to start a new chat.');return;}
  const messages=[...history,{role:'user',content:text}];if(messages.reduce((n,m)=>n+m.content.length,0)>8000){status('Conversation too long. Start a new chat.');return;}
- busy=true;$('send').disabled=true;status('Waiting for a response…');controller=new AbortController();const active=session;const timer=setTimeout(()=>controller?.abort(),25000);
- try{const response=await fetch(endpoint+'/api/chat',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({messages}),signal:controller.signal,credentials:'omit',redirect:'error',referrerPolicy:'no-referrer'});const data=await response.json();if(session!==active)return;
+ busy=true;$('send').disabled=true;status('Waiting for a response…');const requestController=new AbortController();controller=requestController;const active=session;const timer=setTimeout(()=>requestController.abort(),25000);
+ try{const response=await fetch(endpoint+'/api/chat',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({messages}),signal:requestController.signal,credentials:'omit',redirect:'error',referrerPolicy:'no-referrer'});const data=await response.json();if(session!==active)return;
  if(!response.ok)throw Error(data.error||'Request failed');if(typeof data.answer!=='string')throw Error('Invalid response');history=[...messages,{role:'assistant',content:data.answer}];render();$('prompt').value='';status(`Reply received. ${data.remaining} requests left today.`);
  }catch(error){if(session===active)status(error.name==='AbortError'?'Request cancelled or timed out.':error.message||'Connection failed.');}
  finally{clearTimeout(timer);if(session===active){busy=false;$('send').disabled=!token;$('prompt').focus();}}

@@ -9,4 +9,6 @@ Run with Node 22+: `npm test` and `npm run check`. No build step or runtime npm 
 
 Do not put secrets in static files, source control, URLs or screenshots. No deployment/publishing/merge or live API request is authorized by this code checkpoint.
 
-Retry QA: 16/16 tests and local SQLite Durable Object runtime checks PASS. Run `npm ci`, `npm test`, `npm run check`, `npm run test:runtime` and `npm audit`. Dev-only test dependencies are lockfile-pinned; production remains dependency-free. Rendered mobile/browser QA remains pending due environment access restrictions.
+Final local audit: 18/18 tests PASS, with local SQLite Durable Object runtime checks at production `compatibility_date = "2026-11-01"` using test-only workerd 1.20261117.1. Rendered Firefox QA passed at 320/375/768px, including keyboard focus, overflow, forms, mock error/response states and signout. Actual Cloudflare dashboard routes/migrations and assistive-technology/device testing remain pending. See [current audit evidence and blockers](docs/CI-REVIEW.md).
+
+Run `npm ci`, `npm test`, `npm run check`, `npm run test:runtime`, `npm audit` and `node qa/verify-checksums.mjs`. Dev-only dependencies are lockfile-pinned; production remains dependency-free. AI is OFF. No deployment workflow exists.

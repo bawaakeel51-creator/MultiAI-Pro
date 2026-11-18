@@ -21,3 +21,11 @@ test('daily user and global caps, reset and durable restart',async()=>{const {ga
 test('provider errors never expose secret or raw response',async()=>{for(const fetcher of [async()=>new Response('SECRET',{status:429}),async()=>{throw Error('SECRET');},async()=>Response.json({candidates:[]}),async()=>new Response('invalid')]){const {worker,env}=await setup(fetcher);const r=await worker.fetch(request(),env);assert(r.status>=400);assert(!(await r.text()).includes('SECRET'));}});
 test('quota and config failures fail closed',async()=>{const {worker,env}=await setup(()=>assert.fail('network'));env.QUOTAS.get=()=>({fetch:async()=>{throw Error('private');}});assert.equal((await worker.fetch(request(),env)).status,503);env.AUTH_TOKEN_HASHES='bad';assert.equal((await worker.fetch(request(),env)).status,503);});
 test('message role and aggregate validation',()=>{assert(!validMessages([{role:'user',content:'x'},{role:'user',content:'y'}]));assert(!validMessages(Array.from({length:9},(_,i)=>({role:i%2?'assistant':'user',content:'x'.repeat(1000)}))));});
+
+test('content type must be JSON media type, not a prefix lookalike',async()=>{
+ const {worker,env}=await setup(()=>assert.fail('provider must not run'));
+ for(const type of ['application/jsonp','application/json-malicious'])
+  assert.equal((await worker.fetch(request(undefined,{'Content-Type':type}),env)).status,415);
+ env.AI_ENABLED='false';
+ assert.equal((await worker.fetch(request(undefined,{'Content-Type':'Application/JSON; charset=utf-8'}),env)).status,503);
+});

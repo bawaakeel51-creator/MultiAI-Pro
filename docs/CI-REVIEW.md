@@ -1,4 +1,14 @@
-# Final pre-release audit — 17 November 2026
+# Pre-release audit
+
+## 18 November 2026
+
+GitHub Actions run 44269121120 on 704d6d397911a8b5f85025dbfa50616cc1e1bd71 passed all 18 tests, runtime validation, audit and 19 digests. The log reports two Node 20 actions and DEP0040 during setup-node. The follow-up pins Node 24 actions, keeps Node 22 for project tests and disables automatic package-manager caching. A new hosted run must confirm warnings after this change.
+
+Local follow-up covers an in-flight reply clearing an edited draft, private draft cleanup on session replacement and actionable handling of long assistant history. Firefox tested 320, 375, 768 and 1440 CSS pixels with mocked responses. Axe found no automated violations on the initial screen at these sizes. Local UI-to-workerd validation covered preflight and an authenticated AI-disabled response. Physical devices and assistive-technology speech remain unverified.
+
+Cloudflare dashboard, read-only: production workers.dev URL enabled for multiai-pro-api.bawaakeel51.workers.dev, previews disabled, no custom domains or zone routes, zero resource bindings, compatibility date 2026-11-05. Settings showed an encrypted provider key. Repository specifies workers_dev=false, compatibility date 2026-11-01 and QUOTAS with a v1 SQLite migration. Remote migration tag history and a production authenticated chat transaction remain unverified. Resolve routing, bindings, auth configuration and migration compatibility before deployment approval.
+
+## Historical checkpoint — 17 November 2026
 
 Baseline: eff2b89bc06ef6f7b462075681eea146db09283d on Draft PR #1, feature/secure-gemini-mvp. main remains 985586138f236218999c29e85964236695628bec. Earlier work and the checksum fix were preserved; intended changed-file digests are regenerated after validation. Local results below do not imply a remote commit or deployment.
 

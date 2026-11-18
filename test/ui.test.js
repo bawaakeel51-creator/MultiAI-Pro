@@ -31,3 +31,25 @@ test('stale request timeout cannot abort a newer signed-in session',async()=>{
  await Promise.all([first,second]);
  assert.match(u.$('messages').textContent,/Current/);assert(!u.$('messages').textContent.includes('Stale'));
 });
+
+test('reply preserves a new draft and changing sessions clears private drafts', async () => {
+  let finish;
+  const u = ui(() => new Promise(resolve => { finish = resolve; }));
+  u.signin();
+  const pending = u.send('First message');
+  u.$('prompt').value = 'Private next draft';
+  finish(Response.json({answer: 'Done', remaining: 19}));
+  await pending;
+  assert.equal(u.$('prompt').value, 'Private next draft');
+  u.signin();
+  assert.equal(u.$('prompt').value, '');
+});
+
+test('oversize assistant history explains how to restart before another network request', async () => {
+  const u = ui(async () => Response.json({answer: 'x'.repeat(2001), remaining: 19}));
+  u.signin();
+  await u.send('Hello');
+  await u.send('Continue');
+  assert.equal(u.calls.length, 1);
+  assert.match(u.$('status').textContent, /Sign out and reconnect/);
+});

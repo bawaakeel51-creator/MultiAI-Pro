@@ -1,6 +1,16 @@
 # Pre-release audit
 
-## 18 November 2026
+## Release configuration and migration decision — 18 November 2026
+
+The feature configuration retains the current production workers.dev hostname, disables preview URLs explicitly and matches the live compatibility date (2026-11-05). The allowed frontend Origin is https://bawaakeel51-creator.github.io. Enter https://multiai-pro-api.bawaakeel51.workers.dev as the approved origin in the PR frontend; the client appends /api/chat. The published V1 is separate.
+
+The owner reports successful read-only account API access, empty migration_tag values for two deployed versions and empty live settings for migrations and Durable Object bindings. The dashboard namespace named QuotaGate belongs to ai-sellerpilot-v4-api. Preserve its data and isolation. The proposed QUOTAS binding uses this Worker's local QuotaGate export and has no external script_name.
+
+Before release, reconcile the exact multiai-pro-api script's current migration_tag, the available deployed version records, and namespace ownership. If the history establishes the first SQLite class creation, the existing v1 declaration can be reviewed for a separately approved deployment. If an existing MultiAI-Pro namespace or tag is confirmed, recover the matching migration chain and verify class/storage identity before proposing changes. If the records remain ambiguous, keep deployment on hold and obtain Cloudflare confirmation. Do not create a binding manually, guess a replacement tag, or transfer the SellerPilot class.
+
+An approved AI-disabled rollout requires encrypted AUTH_TOKEN_HASHES for an owner-issued random bearer token, the exact allowed Origin, a blank model and AI_ENABLED=false. Preserve the existing encrypted provider key. Independently verify the resulting binding's owner and SQLite storage, then check CORS preflight, unauthenticated 401 and authenticated AI-disabled 503. The disabled response occurs before quota access; it does not verify production quota behavior. Production frontend publication and AI activation require separate decisions.
+
+## Earlier audit — 18 November 2026
 
 GitHub Actions run 44269121120 on 704d6d397911a8b5f85025dbfa50616cc1e1bd71 passed all 18 tests, runtime validation, audit and 19 digests. The log reports two Node 20 actions and DEP0040 during setup-node. The follow-up pins Node 24 actions, keeps Node 22 for project tests and disables automatic package-manager caching. A new hosted run must confirm warnings after this change.
 

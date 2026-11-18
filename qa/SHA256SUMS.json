@@ -4,8 +4,8 @@
   "LICENSE": "f4128c6fa974d2f36e0b24683962efe5f47c1b2e9b336b28ff0809481fc69d3c",
   "README.md": "99167366c0f8c4e864362fbc4d06bb86ffbf7c1e10a9493c2a965d908fa33813",
   "app.js": "f5c485281fc7bfce6cd7b7fdfaa4dc054da4cfef88ee6827fab5987e212eb64c",
-  "docs/CI-REVIEW.md": "20f53f49e0f590cfb6b5eb208a40f96c3acad210d49076119baf32ece289e03a",
-  "docs/SECURE-MVP.md": "fe2d825f97f390895bfb9bad777049ea0e1a731e21b018180216e22f920bc7cd",
+  "docs/CI-REVIEW.md": "0a599834ba56676bb07aef68763e24254c9155b5111655024a3f854950a172e7",
+  "docs/SECURE-MVP.md": "c00d87cd3d03afaeeabbae396f95bb6781b2d1f5246bc09cff5d13a6f25a5662",
   "docs/v1-preview.html": "5ef615d744c82f4a7b4b1f962c2f901eb6b6bf1d6305b66b13cb7060a7037503",
   "index.html": "31e08e7b9616bf1f11988b92c6afc87cd5caeb54e2cd7247bf4f4224aa4dbd74",
   "package-lock.json": "f85d073f84fbb2af0993f461e07272b0c97d91e7db0d252558d114538ddf5654",
@@ -17,5 +17,5 @@
   "test/ui.test.js": "8492498d44426c347f9f1cc0929fc6a37e0c1320604a256ca64e5e570b572f2c",
   "test/worker.test.js": "1052c233c0a90c705b85af0c1e8eea1a1cb140683bb1695bf306cde1b1b08395",
   "worker/index.js": "113089b1a70c1c6a6c4700322b446055e971c5e92e8c3049a4e05d6439ba2096",
-  "wrangler.toml": "f2f0da279a56767ac9682a7adb77ef3182298a94117f51a02a4b540574d58b6e"
+  "wrangler.toml": "29b0ae2fc6a656efba7ffd039b3fc3d8e5c61c6c9884133fc2546b4c3d7fee53"
 }

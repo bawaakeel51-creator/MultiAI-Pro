@@ -1,7 +1,8 @@
 name = "multiai-pro-api"
 main = "worker/index.js"
-compatibility_date = "2026-11-01"
-workers_dev = false
+compatibility_date = "2026-11-05"
+workers_dev = true
+preview_urls = false
 
 [vars]
 AI_ENABLED = "false"
